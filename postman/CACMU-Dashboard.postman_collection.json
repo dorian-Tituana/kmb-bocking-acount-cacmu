@@ -1,0 +1,159 @@
+﻿{
+  "info": {
+    "_postman_id": "4e2e4a65-5140-4f41-91ff-c2be7fd33b43",
+    "name": "CACMU Dashboard API",
+    "description": "Coleccion para probar el backend proxy Express de CACMU Dashboard. El backend maneja la API key en server/.env; desde Postman solo se llama al proxy local.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/health",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "health"
+          ]
+        },
+        "description": "Verifica que el backend proxy este levantado."
+      },
+      "response": []
+    },
+    {
+      "name": "CACMU",
+      "item": [
+        {
+          "name": "Consultar Pregunta de Seguridad",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigoPregunta\": {{codigo_pregunta}},\n  \"NumeroIdentificacion\": \"{{numero_identificacion}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/cacmu/preguntas-seguridad",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "cacmu",
+                "preguntas-seguridad"
+              ]
+            },
+            "description": "Consulta la pregunta de seguridad asociada a una identificacion. CACMU espera codigoPregunta y NumeroIdentificacion."
+          },
+          "response": []
+        },
+        {
+          "name": "Bloquear Banca Virtual",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"NumeroIdentificacion\": \"{{numero_identificacion}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/BancaVirtual/Bloquear",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "BancaVirtual",
+                "Bloquear"
+              ]
+            },
+            "description": "Bloquea una cuenta de banca virtual enviando solo NumeroIdentificacion."
+          },
+          "response": []
+        },
+        {
+          "name": "Debug Pregunta de Seguridad",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/cacmu/debug/pregunta/{{numero_identificacion}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "cacmu",
+                "debug",
+                "pregunta",
+                "{{numero_identificacion}}"
+              ]
+            },
+            "description": "Endpoint auxiliar que prueba variantes de payload/header hacia CACMU. Usar solo para diagnostico."
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": []
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "pm.test(\"Status code is successful\", function () {",
+          "  pm.expect(pm.response.code).to.be.within(200, 299);",
+          "});"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8787"
+    },
+    {
+      "key": "numero_identificacion",
+      "value": "1003434410"
+    },
+    {
+      "key": "codigo_pregunta",
+      "value": "1"
+    }
+  ]
+}
+
