@@ -1,4 +1,4 @@
-﻿const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8787";
+const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8787";
 
 async function post(path, payload) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -18,6 +18,7 @@ async function post(path, payload) {
       messages: ["Respuesta no JSON del backend"],
     };
   }
+
   if (!response.ok) {
     const error = new Error("Error en llamada al backend");
     error.status = response.status;
@@ -28,10 +29,14 @@ async function post(path, payload) {
   return data;
 }
 
-export function consultarPreguntaSeguridad({
-  codigo,
-  numeroIdentificacion,
-}) {
+export function login({ username, password }) {
+  return post("/api/auth/login", {
+    username,
+    password,
+  });
+}
+
+export function consultarPreguntaSeguridad({ codigo, numeroIdentificacion }) {
   const payload = { numeroIdentificacion };
 
   if (codigo) {
@@ -47,8 +52,3 @@ export function bloquearBancaVirtual({ numeroIdentificacion }) {
     NumeroIdentificacion: numeroIdentificacion,
   });
 }
-
-
-
-
-

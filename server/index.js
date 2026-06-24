@@ -1,6 +1,9 @@
-﻿import cors from "cors";
+import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
+import jwt from "jsonwebtoken";
+import mysql from "mysql2/promise";
+import crypto from "node:crypto";
 
 dotenv.config();
 
@@ -9,10 +12,28 @@ const PORT = process.env.PORT || 8787;
 const CACMU_BASE_URL =
   process.env.CACMU_BASE_URL || "https://apis.cacmu.fin.ec/WSIVRCacmu/api";
 const CACMU_API_KEY = process.env.CACMU_API_KEY;
+const JWT_SECRET = process.env.JWT_SECRET;
+
+const MYSQL_CONFIG = {
+  host: process.env.MYSQL_HOST || "172.19.1.78",
+  port: Number(process.env.MYSQL_PORT || 3306),
+  user: process.env.MYSQL_USER || "",
+  password: process.env.MYSQL_PASSWORD || "",
+  database: process.env.MYSQL_DATABASE || "cck_dev",
+  waitForConnections: true,
+  connectionLimit: 5,
+  connectTimeout: 5000,
+  namedPlaceholders: false,
+};
+
+const pool = mysql.createPool(MYSQL_CONFIG);
+
+if (!JWT_SECRET) {
+  console.warn("JWT_SECRET no esta configurado. El login no podra emitir JWT.");
+}
 
 if (!CACMU_API_KEY) {
-  console.error("Falta CACMU_API_KEY en variables de entorno.");
-  process.exit(1);
+  console.warn("CACMU_API_KEY no esta configurado. Los endpoints CACMU no funcionaran.");
 }
 
 app.use(cors());
@@ -22,6 +43,10 @@ function buildHeaders(mode = "bearer") {
   const base = {
     "Content-Type": "application/json",
   };
+
+  if (!CACMU_API_KEY) {
+    return base;
+  }
 
   if (mode === "none") {
     return base;
@@ -53,6 +78,17 @@ function buildHeaders(mode = "bearer") {
 }
 
 async function cacmuPost(path, payload, mode = "bearer") {
+  if (!CACMU_API_KEY) {
+    return {
+      ok: false,
+      status: 503,
+      data: null,
+      raw: null,
+      contentType: "application/json",
+      upstreamUrl: `${CACMU_BASE_URL}${path}`,
+    };
+  }
+
   const upstreamUrl = `${CACMU_BASE_URL}${path}`;
   const response = await fetch(upstreamUrl, {
     method: "POST",
@@ -114,11 +150,7 @@ function normalizeIdentificacion(body = {}) {
 const CODIGOS_PREGUNTA_VALIDOS = [1, 2, 3, 4, 5, 6, 8, 9, 10];
 
 function normalizeCodigoPregunta(body = {}) {
-  const codigo = Number(
-    body.codigo ??
-      body.codigoPregunta ??
-      body.CodigoPregunta
-  );
+  const codigo = Number(body.codigo ?? body.codigoPregunta ?? body.CodigoPregunta);
   return CODIGOS_PREGUNTA_VALIDOS.includes(codigo) ? codigo : null;
 }
 
@@ -130,8 +162,113 @@ function hasCodigoPregunta(body = {}) {
   );
 }
 
+function normalizeAuthValue(value) {
+  return String(value ?? "").trim();
+}
+
+function safeEquals(left, right) {
+  const a = Buffer.from(String(left));
+  const b = Buffer.from(String(right));
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+function signLoginToken(username) {
+  if (!JWT_SECRET) {
+    throw new Error("JWT_SECRET no esta configurado");
+  }
+
+  return jwt.sign(
+    {
+      sub: username,
+      username,
+      name: username,
+      scope: ["cacmu-dashboard"],
+      kind: "login",
+    },
+    JWT_SECRET,
+    {
+      expiresIn: "8h",
+      issuer: "cacmu-dashboard",
+    }
+  );
+}
+
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true, service: "cacmu-proxy", date: new Date().toISOString() });
+});
+
+app.post("/api/auth/login", async (req, res) => {
+  try {
+    const username = normalizeAuthValue(
+      req.body.username ??
+        req.body.usuario ??
+        req.body.identificacion ??
+        req.body.Identification
+    );
+    const password = normalizeAuthValue(req.body.password ?? req.body.contrasenia);
+
+    if (!username || !password) {
+      return res.status(400).json({
+        ok: false,
+        messages: ["username y password son requeridos"],
+      });
+    }
+
+    if (!JWT_SECRET) {
+      return res.status(500).json({
+        ok: false,
+        messages: ["JWT_SECRET no esta configurado en el backend"],
+      });
+    }
+
+    const [rows] = await pool.query(
+      "SELECT Id, Identification, Password, UserGroup FROM `user` WHERE Id = ? OR Identification = ? LIMIT 1",
+      [username, username]
+    );
+
+    const user = Array.isArray(rows) ? rows[0] : null;
+    if (!user) {
+      return res.status(401).json({
+        ok: false,
+        messages: ["Credenciales invalidas"],
+      });
+    }
+
+    if (!safeEquals(user.Password ?? "", password)) {
+      return res.status(401).json({
+        ok: false,
+        messages: ["Credenciales invalidas"],
+      });
+    }
+
+    const token = signLoginToken(user.Id || user.Identification || username);
+
+    return res.json({
+      ok: true,
+      token,
+      user: {
+        username: user.Id || user.Identification || username,
+        name: user.Id || user.Identification || username,
+        identification: user.Identification || null,
+        userGroup: user.UserGroup || null,
+      },
+    });
+  } catch (error) {
+    if (error.code === "ETIMEDOUT" || error.code === "ECONNREFUSED") {
+      return res.status(503).json({
+        ok: false,
+        messages: ["No se pudo conectar a la base de datos MySQL"],
+        detail: error.message,
+      });
+    }
+
+    console.error("Error autenticando usuario:", error);
+    return res.status(500).json({
+      ok: false,
+      messages: ["Error interno autenticando usuario"],
+      detail: error.message,
+    });
+  }
 });
 
 app.get("/api/cacmu/debug/pregunta/:identificacion", async (req, res) => {
@@ -183,14 +320,12 @@ app.post("/api/cacmu/preguntas-seguridad", async (req, res) => {
     const codigoFueEnviado = hasCodigoPregunta(req.body);
 
     if (!numeroIdentificacion) {
-      return res
-        .status(400)
-        .json({
-          ok: false,
-          messages: [
-            "numeroIdentificacion es requerido (tambien acepta identificacion)",
-          ],
-        });
+      return res.status(400).json({
+        ok: false,
+        messages: [
+          "numeroIdentificacion es requerido (tambien acepta identificacion)",
+        ],
+      });
     }
     if (codigoFueEnviado && !codigo) {
       return res.status(400).json({
@@ -295,16 +430,3 @@ app.post("/api/BancaVirtual/Bloquear", bloquearBancaVirtualHandler);
 app.listen(PORT, () => {
   console.log(`CACMU proxy escuchando en http://localhost:${PORT}`);
 });
-
-
-
-
-
-
-
-
-
-
-
-
-

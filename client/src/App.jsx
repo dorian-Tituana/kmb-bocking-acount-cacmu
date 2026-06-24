@@ -1,6 +1,10 @@
-﻿import { useCallback, useMemo, useState } from "react";
-import { bloquearBancaVirtual, consultarPreguntaSeguridad } from "./api";
+import { useEffect, useMemo, useState } from "react";
+import { bloquearBancaVirtual, consultarPreguntaSeguridad, login as loginUsuario } from "./api";
 import "./App.css";
+
+const SESSION_STORAGE_KEY = "cacmu.auth.session";
+const CACMU_BANNER_URL =
+  "https://www.cacmu.fin.ec/web/wp-content/uploads/2023/03/logo-cacmu-1024x565.png";
 
 const PREGUNTAS_SEGURIDAD = [
   {
@@ -21,8 +25,7 @@ const PREGUNTAS_SEGURIDAD = [
     codigo: 3,
     pregunta: "¿Cuál es su correo electrónico registrado en la cooperativa?",
     dificultad: "Intermedia",
-    aclaracion:
-      "Socio/a deberá mencionar el correo electrónico registrado.",
+    aclaracion: "Socio/a deberá mencionar el correo electrónico registrado.",
   },
   {
     codigo: 4,
@@ -84,6 +87,50 @@ const CAMPOS_RESPUESTA = [
   "Data",
 ];
 
+function decodeJwtPart(value) {
+  const normalized = value.replaceAll("-", "+").replaceAll("_", "/");
+  const padded = normalized.padEnd(
+    normalized.length + ((4 - (normalized.length % 4)) % 4),
+    "="
+  );
+  const binary = atob(padded);
+  const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+
+function leerSesionInicial() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(SESSION_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+
+    const session = JSON.parse(raw);
+    const [, payloadPart] = String(session?.token || "").split(".");
+
+    if (!payloadPart) {
+      return null;
+    }
+
+    const payload = decodeJwtPart(payloadPart);
+    if (!payload?.exp || payload.exp * 1000 < Date.now()) {
+      return null;
+    }
+
+    return {
+      token: session.token,
+      user: payload,
+    };
+  } catch {
+    return null;
+  }
+}
+
 function JsonBox({ data }) {
   return <pre className="json-box">{JSON.stringify(data, null, 2)}</pre>;
 }
@@ -95,7 +142,9 @@ function tomarAleatoria(items) {
 function seleccionarPreguntasAleatorias() {
   return ["Básica", "Intermedia", "Avanzada"].map((dificultad) =>
     tomarAleatoria(
-      PREGUNTAS_SEGURIDAD.filter((pregunta) => pregunta.dificultad === dificultad)
+      PREGUNTAS_SEGURIDAD.filter(
+        (pregunta) => pregunta.dificultad === dificultad
+      )
     )
   );
 }
@@ -141,6 +190,7 @@ function extraerRespuesta(payload) {
     if (camposIgnorados.has(campo)) {
       continue;
     }
+
     const respuesta = extraerRespuesta(valor);
     if (respuesta) {
       return respuesta;
@@ -150,8 +200,149 @@ function extraerRespuesta(payload) {
   return "";
 }
 
-function App() {
-  const [numeroIdentificacion, setNumeroIdentificacion] = useState("1003434410");
+function LoginScreen({ onLogin }) {
+  const [usuario, setUsuario] = useState("");
+  const [contrasenia, setContrasenia] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const submit = async (event) => {
+    event.preventDefault();
+
+    const username = usuario.trim();
+    const password = contrasenia.trim();
+
+    if (!username || !password) {
+      setError("Ingresa usuario y contraseña para entrar.");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    try {
+      await onLogin({ username, password });
+    } catch (loginError) {
+      const message =
+        loginError?.payload?.messages?.[0] ||
+        loginError?.message ||
+        "No se pudo iniciar sesión";
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <section className="login-wrap">
+      <form className="surface auth-card" onSubmit={submit}>
+        <div className="login-brand">
+          <img
+            className="brand-banner"
+            src={CACMU_BANNER_URL}
+            alt="CACMU Cooperativa de Ahorro y Crédito Mujeres Unidas"
+          />
+          <h1 className="login-title">Bloqueo de cuenta</h1>
+        </div>
+
+        <div className="field">
+          <label htmlFor="login-user">Usuario</label>
+          <input
+            id="login-user"
+            value={usuario}
+            onChange={(event) => {
+              setUsuario(event.target.value);
+              if (error) {
+                setError("");
+              }
+            }}
+            placeholder="Usuario"
+            autoComplete="username"
+          />
+        </div>
+
+        <div className="field">
+          <label htmlFor="login-pass">Contraseña</label>
+          <input
+            id="login-pass"
+            type="password"
+            value={contrasenia}
+            onChange={(event) => {
+              setContrasenia(event.target.value);
+              if (error) {
+                setError("");
+              }
+            }}
+            placeholder="Contraseña"
+            autoComplete="current-password"
+          />
+        </div>
+
+        {error ? <p className="inline-alert">{error}</p> : null}
+
+        <button type="submit" disabled={loading}>
+          {loading ? "Ingresando..." : "Ingresar"}
+        </button>
+      </form>
+    </section>
+  );
+}
+
+function CedulaGate({ onValidate, onLogout, username }) {
+  const [cedula, setCedula] = useState("");
+  const [error, setError] = useState("");
+
+  const submit = (event) => {
+    event.preventDefault();
+
+    const valor = cedula.trim();
+    if (!valor) {
+      setError("Ingresa una cédula para continuar.");
+      return;
+    }
+
+    onValidate(valor);
+  };
+
+  return (
+    <section className="surface gate-panel">
+      <div className="gate-copy">
+        <span className="eyebrow">Sesión activa</span>
+        <h2>Hola, {username}</h2>
+        <p>Ahora valida la cédula para desplegar la consulta de preguntas.</p>
+      </div>
+
+      <form className="gate-form" onSubmit={submit}>
+        <div className="field">
+          <label htmlFor="cedula-input">Cédula</label>
+          <input
+            id="cedula-input"
+            value={cedula}
+            onChange={(event) => {
+              setCedula(event.target.value);
+              if (error) {
+                setError("");
+              }
+            }}
+            placeholder="Ingresa la cédula"
+            inputMode="numeric"
+          />
+        </div>
+
+        {error ? <p className="inline-alert">{error}</p> : null}
+
+        <div className="gate-actions">
+          <button type="submit">Validar cédula</button>
+          <button type="button" className="ghost-button" onClick={onLogout}>
+            Cerrar sesión
+          </button>
+        </div>
+      </form>
+    </section>
+  );
+}
+
+function AppShell({ session, numeroIdentificacion, onLogout }) {
   const [preguntas, setPreguntas] = useState([]);
   const [resultadoConsulta, setResultadoConsulta] = useState({});
   const [resultadoBloqueo, setResultadoBloqueo] = useState({});
@@ -159,17 +350,17 @@ function App() {
   const [loadingBloqueo, setLoadingBloqueo] = useState(false);
 
   const todasRespondidas = preguntas.length === 3;
-  const todasCorrectas = todasRespondidas && preguntas.every(
-    (pregunta) => pregunta.correcta
-  );
+  const todasCorrectas =
+    todasRespondidas && preguntas.every((pregunta) => pregunta.correcta);
 
   const resumenValidacion = useMemo(() => {
     if (!preguntas.length) {
-      return "Genere 3 preguntas aleatorias para iniciar la validación.";
+      return "Genera 3 preguntas aleatorias para iniciar la validación.";
     }
+
     return todasCorrectas
       ? "Las 3 respuestas coinciden. Se puede bloquear."
-      : "Marque Coincide solo cuando la respuesta sea la misma.";
+      : "Marca Coincide solo cuando la respuesta sea la misma.";
   }, [preguntas.length, todasCorrectas]);
 
   const generarPreguntas = async (event) => {
@@ -233,7 +424,7 @@ function App() {
     );
   };
 
-  const bloquear = useCallback(async () => {
+  const bloquear = async () => {
     setLoadingBloqueo(true);
 
     try {
@@ -250,34 +441,49 @@ function App() {
     } finally {
       setLoadingBloqueo(false);
     }
-  }, [numeroIdentificacion]);
-
+  };
 
   return (
-    <main className="container">
-      <header>
-        <h1>CACMU Integración Segura</h1>
-        <p>
-          Validación con 1 pregunta básica, 1 intermedia y 1 avanzada antes del
-          bloqueo.
-        </p>
-      </header>
+    <section className="workflow">
+      <div className="workflow-header">
+        <div>
+          <span className="eyebrow">Flujo operativo</span>
+          <h2>Cédula validada: {numeroIdentificacion}</h2>
+          <p>
+            Primero se consultan las preguntas, luego se confirma si coinciden
+            y recién ahí se habilita el bloqueo.
+          </p>
+        </div>
 
-      <section className="card compact-card">
+        <div className="session-card">
+          <span>Usuario</span>
+          <strong>{session?.user?.name || session?.user?.sub || "Sesión"}</strong>
+          <button type="button" className="ghost-button" onClick={onLogout}>
+            Cerrar sesión
+          </button>
+        </div>
+      </div>
+
+      <section className="surface compact-card">
         <div className="section-heading">
           <div>
-            <h2>Validar preguntas</h2>
-            <p className="status-text">Ingrese la identificación y genere las 3 preguntas.</p>
+            <h3>Validar preguntas</h3>
+            <p className="status-text">
+              Ingrese la identificación y genere las 3 preguntas.
+            </p>
           </div>
+          <span className="step-badge">Paso 2</span>
         </div>
+
         <form className="inline-form" onSubmit={generarPreguntas}>
-          <label htmlFor="numero-identificacion">Identificación</label>
-          <input
-            id="numero-identificacion"
-            value={numeroIdentificacion}
-            onChange={(event) => setNumeroIdentificacion(event.target.value)}
-            required
-          />
+          <div className="field">
+            <label htmlFor="numero-identificacion">Identificación</label>
+            <input
+              id="numero-identificacion"
+              value={numeroIdentificacion}
+              readOnly
+            />
+          </div>
 
           <button type="submit" disabled={loadingPreguntas}>
             {loadingPreguntas ? "Consultando..." : "Generar 3 preguntas"}
@@ -285,10 +491,15 @@ function App() {
         </form>
       </section>
 
-      <section className="card compact-card">
+      <section className="surface compact-card">
         <div className="section-heading">
-          <h2>Respuestas del cliente</h2>
-        <span
+          <div>
+            <h3>Respuestas del cliente</h3>
+            <p className="status-text">
+              Marca las preguntas que coinciden con la respuesta registrada.
+            </p>
+          </div>
+          <span
             className={`answer-result ${
               !preguntas.length || !todasRespondidas
                 ? "pending"
@@ -302,49 +513,64 @@ function App() {
         </div>
 
         <div className="questions-grid compact-questions">
-          {preguntas.map((pregunta) => (
-            <article className="question-card compact-question" key={pregunta.codigo}>
-              <div className="question-main">
-                <div className="question-header">
-                  <span className="badge">{pregunta.dificultad}</span>
-                  <span>Código {pregunta.codigo}</span>
+          {preguntas.length ? (
+            preguntas.map((pregunta) => (
+              <article
+                className="question-card compact-question"
+                key={pregunta.codigo}
+              >
+                <div className="question-main">
+                  <div className="question-header">
+                    <span className="badge">{pregunta.dificultad}</span>
+                    <span>Código {pregunta.codigo}</span>
+                  </div>
+                  <h3>{pregunta.pregunta}</h3>
+                  <p>{pregunta.aclaracion}</p>
                 </div>
-                <h3>{pregunta.pregunta}</h3>
-                <p>{pregunta.aclaracion}</p>
-              </div>
 
-              <div className="registered-answer">
-                <span>Registrado</span>
-                <strong>{pregunta.respuestaEsperada || "Sin dato"}</strong>
-              </div>
-              <div className="answer-tools">
-                <label className="check-option ok-check single-check">
-                  <input
-                    type="checkbox"
-                    checked={pregunta.correcta}
-                    onChange={(event) =>
-                      actualizarRespuesta(pregunta.codigo, event.target.checked)
-                    }
-                  />
-                  Coincide
-                </label>
-                <details className="question-debug">
-                  <summary>Ver endpoint</summary>
-                  <JsonBox data={pregunta.payload} />
-                </details>
-              </div>
-            </article>
-          ))}
+                <div className="registered-answer">
+                  <span>Registrado</span>
+                  <strong>{pregunta.respuestaEsperada || "Sin dato"}</strong>
+                </div>
+
+                <div className="answer-tools">
+                  <label className="check-option ok-check single-check">
+                    <input
+                      type="checkbox"
+                      checked={pregunta.correcta}
+                      onChange={(event) =>
+                        actualizarRespuesta(
+                          pregunta.codigo,
+                          event.target.checked
+                        )
+                      }
+                    />
+                    Coincide
+                  </label>
+                  <details className="question-debug">
+                    <summary>Ver endpoint</summary>
+                    <JsonBox data={pregunta.payload} />
+                  </details>
+                </div>
+              </article>
+            ))
+          ) : (
+            <div className="empty-state">
+              Genera las preguntas para revisar la validación.
+            </div>
+          )}
         </div>
       </section>
 
-      <section className="card compact-card block-card">
+      <section className="surface compact-card block-card">
         <div>
-          <h2>Bloqueo</h2>
+          <h3>Bloqueo</h3>
           <p className="status-text">
-            Marque las 3 respuestas como correctas y presione el botón para bloquear.
+            Solo se habilita cuando las 3 respuestas están marcadas como
+            correctas.
           </p>
         </div>
+
         <button
           type="button"
           disabled={!todasCorrectas || loadingBloqueo}
@@ -352,33 +578,83 @@ function App() {
         >
           {loadingBloqueo ? "Bloqueando..." : "Bloquear banca virtual"}
         </button>
+
         <details className="debug-details" open={Boolean(resultadoBloqueo.error)}>
           <summary>Ver respuesta de bloqueo</summary>
           <JsonBox data={resultadoBloqueo} />
         </details>
       </section>
 
-      <section className="card compact-card">
+      <section className="surface compact-card">
         <details className="debug-details">
           <summary>Resumen técnico de consulta</summary>
           <JsonBox data={resultadoConsulta} />
         </details>
       </section>
+    </section>
+  );
+}
+
+function App() {
+  const [session, setSession] = useState(() => leerSesionInicial());
+  const [numeroIdentificacion, setNumeroIdentificacion] = useState("");
+  const [cedulaValidada, setCedulaValidada] = useState(false);
+
+  useEffect(() => {
+    if (!session) {
+      window.localStorage.removeItem(SESSION_STORAGE_KEY);
+      return;
+    }
+
+    window.localStorage.setItem(
+      SESSION_STORAGE_KEY,
+      JSON.stringify({ token: session.token })
+    );
+  }, [session]);
+
+  const handleLogin = async ({ username, password }) => {
+    const data = await loginUsuario({ username, password });
+    setSession({
+      token: data.token,
+      user: data.user || decodeJwtPart(data.token.split(".")[1]),
+    });
+    setCedulaValidada(false);
+    setNumeroIdentificacion("");
+  };
+
+  const handleValidateCedula = (valor) => {
+    setNumeroIdentificacion(valor);
+    setCedulaValidada(true);
+  };
+
+  const handleLogout = () => {
+    setSession(null);
+    setNumeroIdentificacion("");
+    setCedulaValidada(false);
+  };
+
+  return (
+    <main className="app-shell">
+      <div className="ambient ambient-one" />
+      <div className="ambient ambient-two" />
+
+      {!session ? (
+        <LoginScreen onLogin={handleLogin} />
+      ) : !cedulaValidada ? (
+        <CedulaGate
+          onValidate={handleValidateCedula}
+          onLogout={handleLogout}
+          username={session.user?.name || session.user?.sub || "Usuario"}
+        />
+      ) : (
+        <AppShell
+          session={session}
+          numeroIdentificacion={numeroIdentificacion}
+          onLogout={handleLogout}
+        />
+      )}
     </main>
   );
 }
 
 export default App;
-
-
-
-
-
-
-
-
-
-
-
-
-
