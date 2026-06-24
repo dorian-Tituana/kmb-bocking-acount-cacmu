@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { bloquearBancaVirtual, consultarPreguntaSeguridad, login as loginUsuario } from "./api";
 import "./App.css";
 
-const SESSION_STORAGE_KEY = "cacmu.auth.session";
+const SESSION_STORAGE_KEY = "cacmu.mock.session";
 const CACMU_BANNER_URL =
   "https://www.cacmu.fin.ec/web/wp-content/uploads/2023/03/logo-cacmu-1024x565.png";
 
@@ -74,19 +73,6 @@ const PREGUNTAS_SEGURIDAD = [
   },
 ];
 
-const CAMPOS_RESPUESTA = [
-  "respuesta",
-  "Respuesta",
-  "respuestaCorrecta",
-  "RespuestaCorrecta",
-  "dato",
-  "Dato",
-  "valor",
-  "Valor",
-  "data",
-  "Data",
-];
-
 function decodeJwtPart(value) {
   const normalized = value.replaceAll("-", "+").replaceAll("_", "/");
   const padded = normalized.padEnd(
@@ -97,6 +83,66 @@ function decodeJwtPart(value) {
   const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
 
   return JSON.parse(new TextDecoder().decode(bytes));
+}
+
+function encodeJwtPart(value) {
+  const bytes = new TextEncoder().encode(JSON.stringify(value));
+  let binary = "";
+
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+
+  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
+}
+
+function crearJwtMock(username) {
+  const now = Math.floor(Date.now() / 1000);
+  const header = { alg: "none", typ: "JWT" };
+  const payload = {
+    sub: username,
+    name: username,
+    username,
+    kind: "mock-login",
+    iat: now,
+    exp: now + 60 * 60 * 8,
+  };
+
+  return `${encodeJwtPart(header)}.${encodeJwtPart(payload)}.mock`;
+}
+
+function validarCedulaEcuatoriana(valor) {
+  const cedula = String(valor || "").trim();
+
+  if (!/^\d{10}$/.test(cedula)) {
+    return false;
+  }
+
+  const provincia = Number(cedula.slice(0, 2));
+  const tercerDigito = Number(cedula[2]);
+
+  if (provincia < 1 || provincia > 24) {
+    return false;
+  }
+
+  if (tercerDigito >= 6) {
+    return false;
+  }
+
+  let suma = 0;
+  for (let i = 0; i < 9; i += 1) {
+    let valorDigito = Number(cedula[i]);
+    if (i % 2 === 0) {
+      valorDigito *= 2;
+      if (valorDigito > 9) {
+        valorDigito -= 9;
+      }
+    }
+    suma += valorDigito;
+  }
+
+  const digitoVerificador = (10 - (suma % 10)) % 10;
+  return digitoVerificador === Number(cedula[9]);
 }
 
 function leerSesionInicial() {
@@ -149,57 +195,6 @@ function seleccionarPreguntasAleatorias() {
   );
 }
 
-function extraerRespuesta(payload) {
-  if (payload === null || payload === undefined) {
-    return "";
-  }
-
-  if (["string", "number", "boolean"].includes(typeof payload)) {
-    return String(payload);
-  }
-
-  if (Array.isArray(payload)) {
-    for (const item of payload) {
-      const respuesta = extraerRespuesta(item);
-      if (respuesta) {
-        return respuesta;
-      }
-    }
-    return "";
-  }
-
-  for (const campo of CAMPOS_RESPUESTA) {
-    if (Object.prototype.hasOwnProperty.call(payload, campo)) {
-      const respuesta = extraerRespuesta(payload[campo]);
-      if (respuesta) {
-        return respuesta;
-      }
-    }
-  }
-
-  const camposIgnorados = new Set([
-    "ok",
-    "Ok",
-    "messages",
-    "Messages",
-    "idTransaccion",
-    "IdTransaccion",
-  ]);
-
-  for (const [campo, valor] of Object.entries(payload)) {
-    if (camposIgnorados.has(campo)) {
-      continue;
-    }
-
-    const respuesta = extraerRespuesta(valor);
-    if (respuesta) {
-      return respuesta;
-    }
-  }
-
-  return "";
-}
-
 function LoginScreen({ onLogin }) {
   const [usuario, setUsuario] = useState("");
   const [contrasenia, setContrasenia] = useState("");
@@ -219,18 +214,8 @@ function LoginScreen({ onLogin }) {
 
     setLoading(true);
     setError("");
-
-    try {
-      await onLogin({ username, password });
-    } catch (loginError) {
-      const message =
-        loginError?.payload?.messages?.[0] ||
-        loginError?.message ||
-        "No se pudo iniciar sesión";
-      setError(message);
-    } finally {
-      setLoading(false);
-    }
+    onLogin({ username, password });
+    setLoading(false);
   };
 
   return (
@@ -301,6 +286,11 @@ function CedulaGate({ onValidate, onLogout, username }) {
       return;
     }
 
+    if (!validarCedulaEcuatoriana(valor)) {
+      setError("La cédula ecuatoriana no es válida.");
+      return;
+    }
+
     onValidate(valor);
   };
 
@@ -319,13 +309,15 @@ function CedulaGate({ onValidate, onLogout, username }) {
             id="cedula-input"
             value={cedula}
             onChange={(event) => {
-              setCedula(event.target.value);
+              const soloNumeros = event.target.value.replace(/\D/g, "");
+              setCedula(soloNumeros);
               if (error) {
                 setError("");
               }
             }}
             placeholder="Ingresa la cédula"
             inputMode="numeric"
+            maxLength={10}
           />
         </div>
 
@@ -363,52 +355,38 @@ function AppShell({ session, numeroIdentificacion, onLogout }) {
       : "Marca Coincide solo cuando la respuesta sea la misma.";
   }, [preguntas.length, todasCorrectas]);
 
-  const generarPreguntas = async (event) => {
+  const generarPreguntas = (event) => {
     event.preventDefault();
     setLoadingPreguntas(true);
     setResultadoBloqueo({});
 
     const seleccionadas = seleccionarPreguntasAleatorias();
-
-    try {
-      const consultas = await Promise.all(
-        seleccionadas.map(async (pregunta) => {
-          const payload = await consultarPreguntaSeguridad({
-            codigo: pregunta.codigo,
-            numeroIdentificacion: numeroIdentificacion.trim(),
-          });
-
-          return {
-            ...pregunta,
-            respuestaEsperada: extraerRespuesta(payload),
-            correcta: false,
-            payload,
-          };
-        })
-      );
-
-      setPreguntas(consultas);
-      setResultadoConsulta({
+    const consultas = seleccionadas.map((pregunta) => ({
+      ...pregunta,
+      respuestaEsperada: `Respuesta simulada ${pregunta.codigo}`,
+      correcta: false,
+      payload: {
         ok: true,
-        preguntas: consultas.map(
-          ({ codigo, dificultad, pregunta, respuestaEsperada }) => ({
-            codigo,
-            dificultad,
-            pregunta,
-            respuestaEsperada,
-          })
-        ),
-      });
-    } catch (error) {
-      setPreguntas([]);
-      setResultadoConsulta({
-        ok: false,
-        status: error.status || 500,
-        error: error.payload || error.message,
-      });
-    } finally {
-      setLoadingPreguntas(false);
-    }
+        source: "mock-postlogin",
+        codigo: pregunta.codigo,
+        numeroIdentificacion: numeroIdentificacion.trim(),
+      },
+    }));
+
+    setPreguntas(consultas);
+    setResultadoConsulta({
+      ok: true,
+      mock: true,
+      preguntas: consultas.map(
+        ({ codigo, dificultad, pregunta, respuestaEsperada }) => ({
+          codigo,
+          dificultad,
+          pregunta,
+          respuestaEsperada,
+        })
+      ),
+    });
+    setLoadingPreguntas(false);
   };
 
   const actualizarRespuesta = (codigo, correcta) => {
@@ -424,23 +402,16 @@ function AppShell({ session, numeroIdentificacion, onLogout }) {
     );
   };
 
-  const bloquear = async () => {
+  const bloquear = () => {
     setLoadingBloqueo(true);
-
-    try {
-      const data = await bloquearBancaVirtual({
-        numeroIdentificacion: numeroIdentificacion.trim(),
-      });
-      setResultadoBloqueo(data);
-    } catch (error) {
-      setResultadoBloqueo({
-        ok: false,
-        status: error.status || 500,
-        error: error.payload || error.message,
-      });
-    } finally {
-      setLoadingBloqueo(false);
-    }
+    setResultadoBloqueo({
+      ok: true,
+      mock: true,
+      messages: [
+        `Bloqueo simulado para ${numeroIdentificacion.trim()} con 3 coincidencias.`,
+      ],
+    });
+    setLoadingBloqueo(false);
   };
 
   return (
@@ -612,11 +583,11 @@ function App() {
     );
   }, [session]);
 
-  const handleLogin = async ({ username, password }) => {
-    const data = await loginUsuario({ username, password });
+  const handleLogin = ({ username }) => {
+    const token = crearJwtMock(username);
     setSession({
-      token: data.token,
-      user: data.user || decodeJwtPart(data.token.split(".")[1]),
+      token,
+      user: decodeJwtPart(token.split(".")[1]),
     });
     setCedulaValidada(false);
     setNumeroIdentificacion("");
