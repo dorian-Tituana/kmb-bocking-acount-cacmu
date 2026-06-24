@@ -8,68 +8,62 @@ const CACMU_BANNER_URL =
 const PREGUNTAS_SEGURIDAD = [
   {
     codigo: 1,
-    pregunta: "¿Cuál es su fecha de nacimiento? (DD/MM/AAAA)",
-    dificultad: "Básica",
+    pregunta: "Cual es su fecha de nacimiento? (DD/MM/AAAA)",
+    dificultad: "Basica",
     aclaracion:
-      "Socio/a deberá mencionar su fecha de nacimiento registrada en su cédula.",
+      "El socio debe mencionar la fecha de nacimiento registrada en su cedula.",
   },
   {
     codigo: 2,
-    pregunta: "¿Cuál es su estado civil registrado en la cooperativa?",
-    dificultad: "Básica",
+    pregunta: "Cual es su estado civil registrado en la cooperativa?",
+    dificultad: "Basica",
     aclaracion:
-      "Socio/a deberá mencionar el estado civil que registró en la cooperativa.",
+      "El socio debe mencionar el estado civil registrado en la cooperativa.",
   },
   {
     codigo: 3,
-    pregunta: "¿Cuál es su correo electrónico registrado en la cooperativa?",
+    pregunta: "Cual es su correo electronico registrado en la cooperativa?",
     dificultad: "Intermedia",
-    aclaracion: "Socio/a deberá mencionar el correo electrónico registrado.",
+    aclaracion: "El socio debe mencionar el correo electronico registrado.",
   },
   {
     codigo: 4,
-    pregunta: "¿Cuál es su número celular registrado en la cooperativa?",
+    pregunta: "Cual es su numero celular registrado en la cooperativa?",
     dificultad: "Intermedia",
-    aclaracion:
-      "Socio/a deberá mencionar el número celular registrado en la cooperativa.",
+    aclaracion: "El socio debe mencionar el numero celular registrado.",
   },
   {
     codigo: 5,
-    pregunta: "¿Cuál es su lugar de residencia registrada en la cooperativa?",
+    pregunta: "Cual es su lugar de residencia registrado en la cooperativa?",
     dificultad: "Intermedia",
     aclaracion:
-      "Socio/a deberá mencionar el lugar de residencia registrado al aperturar su cuenta de ahorros.",
+      "El socio debe mencionar el lugar de residencia registrado al aperturar su cuenta.",
   },
   {
     codigo: 6,
-    pregunta: "¿En qué agencia de nuestra cooperativa aperturó su cuenta?",
+    pregunta: "En que agencia de nuestra cooperativa abrio su cuenta?",
     dificultad: "Avanzada",
     aclaracion:
-      "Socio/a deberá mencionar el nombre de la agencia o ciudad donde abrió la cuenta de ahorros.",
+      "El socio debe mencionar la agencia o ciudad donde abrio la cuenta.",
   },
   {
     codigo: 8,
-    pregunta:
-      "¿Ha realizado transferencias en su cuenta de la cooperativa en los últimos 5 días?",
+    pregunta: "Ha realizado transferencias en su cuenta en los ultimos 5 dias?",
     dificultad: "Avanzada",
-    aclaracion:
-      "Socio/a deberá mencionar sí o no ha realizado transferencias en los últimos 5 días.",
+    aclaracion: "El socio debe responder si o no sobre transferencias recientes.",
   },
   {
     codigo: 9,
-    pregunta:
-      "¿Ha realizado depósitos en su cuenta de la cooperativa en el último mes?",
+    pregunta: "Ha realizado depositos en su cuenta en el ultimo mes?",
     dificultad: "Avanzada",
-    aclaracion:
-      "Socio/a deberá mencionar sí o no ha realizado depósitos en el último mes.",
+    aclaracion: "El socio debe responder si o no sobre depositos recientes.",
   },
   {
     codigo: 10,
-    pregunta:
-      "¿Ha realizado una actualización de información en los últimos 3 meses?",
+    pregunta: "Ha realizado una actualizacion de informacion en los ultimos 3 meses?",
     dificultad: "Avanzada",
     aclaracion:
-      "Socio/a deberá mencionar sí o no ha realizado actualización de información.",
+      "El socio debe responder si o no sobre la actualizacion de informacion.",
   },
 ];
 
@@ -177,16 +171,12 @@ function leerSesionInicial() {
   }
 }
 
-function JsonBox({ data }) {
-  return <pre className="json-box">{JSON.stringify(data, null, 2)}</pre>;
-}
-
 function tomarAleatoria(items) {
   return items[Math.floor(Math.random() * items.length)];
 }
 
 function seleccionarPreguntasAleatorias() {
-  return ["Básica", "Intermedia", "Avanzada"].map((dificultad) =>
+  return ["Basica", "Intermedia", "Avanzada"].map((dificultad) =>
     tomarAleatoria(
       PREGUNTAS_SEGURIDAD.filter(
         (pregunta) => pregunta.dificultad === dificultad
@@ -195,20 +185,27 @@ function seleccionarPreguntasAleatorias() {
   );
 }
 
+function crearPreguntasIniciales() {
+  return seleccionarPreguntasAleatorias().map((pregunta) => ({
+    ...pregunta,
+    correcta: false,
+  }));
+}
+
 function LoginScreen({ onLogin }) {
   const [usuario, setUsuario] = useState("");
   const [contrasenia, setContrasenia] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const submit = async (event) => {
+  const submit = (event) => {
     event.preventDefault();
 
     const username = usuario.trim();
     const password = contrasenia.trim();
 
     if (!username || !password) {
-      setError("Ingresa usuario y contraseña para entrar.");
+      setError("Ingresa usuario y contrasena para entrar.");
       return;
     }
 
@@ -225,7 +222,7 @@ function LoginScreen({ onLogin }) {
           <img
             className="brand-banner"
             src={CACMU_BANNER_URL}
-            alt="CACMU Cooperativa de Ahorro y Crédito Mujeres Unidas"
+            alt="CACMU Cooperativa de Ahorro y Credito Mujeres Unidas"
           />
           <h1 className="login-title">Bloqueo de cuenta</h1>
         </div>
@@ -247,7 +244,7 @@ function LoginScreen({ onLogin }) {
         </div>
 
         <div className="field">
-          <label htmlFor="login-pass">Contraseña</label>
+          <label htmlFor="login-pass">Contrasena</label>
           <input
             id="login-pass"
             type="password"
@@ -258,7 +255,7 @@ function LoginScreen({ onLogin }) {
                 setError("");
               }
             }}
-            placeholder="Contraseña"
+            placeholder="Contrasena"
             autoComplete="current-password"
           />
         </div>
@@ -282,12 +279,12 @@ function CedulaGate({ onValidate, onLogout, username }) {
 
     const valor = cedula.trim();
     if (!valor) {
-      setError("Ingresa una cédula para continuar.");
+      setError("Ingresa una cedula para continuar.");
       return;
     }
 
     if (!validarCedulaEcuatoriana(valor)) {
-      setError("La cédula ecuatoriana no es válida.");
+      setError("La cedula ecuatoriana no es valida.");
       return;
     }
 
@@ -297,14 +294,13 @@ function CedulaGate({ onValidate, onLogout, username }) {
   return (
     <section className="surface gate-panel">
       <div className="gate-copy">
-        <span className="eyebrow">Sesión activa</span>
+        <span className="eyebrow">Sesion activa</span>
         <h2>Hola, {username}</h2>
-        <p>Ahora valida la cédula para desplegar la consulta de preguntas.</p>
       </div>
 
       <form className="gate-form" onSubmit={submit}>
         <div className="field">
-          <label htmlFor="cedula-input">Cédula</label>
+          <label htmlFor="cedula-input">Cedula</label>
           <input
             id="cedula-input"
             value={cedula}
@@ -315,7 +311,7 @@ function CedulaGate({ onValidate, onLogout, username }) {
                 setError("");
               }
             }}
-            placeholder="Ingresa la cédula"
+            placeholder="Ingresa la cedula"
             inputMode="numeric"
             maxLength={10}
           />
@@ -324,9 +320,9 @@ function CedulaGate({ onValidate, onLogout, username }) {
         {error ? <p className="inline-alert">{error}</p> : null}
 
         <div className="gate-actions">
-          <button type="submit">Validar cédula</button>
+          <button type="submit">Validar cedula</button>
           <button type="button" className="ghost-button" onClick={onLogout}>
-            Cerrar sesión
+            Cerrar sesion
           </button>
         </div>
       </form>
@@ -334,60 +330,28 @@ function CedulaGate({ onValidate, onLogout, username }) {
   );
 }
 
-function AppShell({ session, numeroIdentificacion, onLogout }) {
-  const [preguntas, setPreguntas] = useState([]);
-  const [resultadoConsulta, setResultadoConsulta] = useState({});
-  const [resultadoBloqueo, setResultadoBloqueo] = useState({});
-  const [loadingPreguntas, setLoadingPreguntas] = useState(false);
+function AppShell({ session, numeroIdentificacion, onLogout, preguntasIniciales }) {
+  const [preguntas, setPreguntas] = useState(() => preguntasIniciales);
   const [loadingBloqueo, setLoadingBloqueo] = useState(false);
 
-  const todasRespondidas = preguntas.length === 3;
-  const todasCorrectas =
-    todasRespondidas && preguntas.every((pregunta) => pregunta.correcta);
+  const respondidas = preguntas.filter((pregunta) => pregunta.correcta).length;
+  const todasRespondidas = preguntas.length === 3 && respondidas === 3;
+  const resultadoCaso = todasRespondidas ? "Bloqueo aprobado" : "Intento fallido";
+  const accionPrincipal = todasRespondidas
+    ? "Guardar y bloquear"
+    : "Guardar intento fallido";
 
   const resumenValidacion = useMemo(() => {
     if (!preguntas.length) {
-      return "Genera 3 preguntas aleatorias para iniciar la validación.";
+      return "Las preguntas se cargan apenas validas la cedula del socio.";
     }
 
-    return todasCorrectas
-      ? "Las 3 respuestas coinciden. Se puede bloquear."
-      : "Marca Coincide solo cuando la respuesta sea la misma.";
-  }, [preguntas.length, todasCorrectas]);
+    if (todasRespondidas) {
+      return "Las 3 validaciones estan completas y el bloqueo puede registrarse.";
+    }
 
-  const generarPreguntas = (event) => {
-    event.preventDefault();
-    setLoadingPreguntas(true);
-    setResultadoBloqueo({});
-
-    const seleccionadas = seleccionarPreguntasAleatorias();
-    const consultas = seleccionadas.map((pregunta) => ({
-      ...pregunta,
-      respuestaEsperada: `Respuesta simulada ${pregunta.codigo}`,
-      correcta: false,
-      payload: {
-        ok: true,
-        source: "mock-postlogin",
-        codigo: pregunta.codigo,
-        numeroIdentificacion: numeroIdentificacion.trim(),
-      },
-    }));
-
-    setPreguntas(consultas);
-    setResultadoConsulta({
-      ok: true,
-      mock: true,
-      preguntas: consultas.map(
-        ({ codigo, dificultad, pregunta, respuestaEsperada }) => ({
-          codigo,
-          dificultad,
-          pregunta,
-          respuestaEsperada,
-        })
-      ),
-    });
-    setLoadingPreguntas(false);
-  };
+    return `Progreso de validacion: ${respondidas}/3 preguntas marcadas.`;
+  }, [preguntas.length, respondidas, todasRespondidas]);
 
   const actualizarRespuesta = (codigo, correcta) => {
     setPreguntas((actuales) =>
@@ -404,163 +368,94 @@ function AppShell({ session, numeroIdentificacion, onLogout }) {
 
   const bloquear = () => {
     setLoadingBloqueo(true);
-    setResultadoBloqueo({
-      ok: true,
-      mock: true,
-      messages: [
-        `Bloqueo simulado para ${numeroIdentificacion.trim()} con 3 coincidencias.`,
-      ],
-    });
-    setLoadingBloqueo(false);
+    window.setTimeout(() => {
+      setLoadingBloqueo(false);
+    }, 700);
   };
 
   return (
-    <section className="workflow">
-      <div className="workflow-header">
-        <div>
-          <span className="eyebrow">Flujo operativo</span>
-          <h2>Cédula validada: {numeroIdentificacion}</h2>
-          <p>
-            Primero se consultan las preguntas, luego se confirma si coinciden
-            y recién ahí se habilita el bloqueo.
-          </p>
+    <section className="workspace">
+      <header className="surface workspace-header">
+        <div className="workspace-title">
+          <span className="eyebrow">Atencion en llamada</span>
+          <h2>Bloqueo de cuenta</h2>
         </div>
 
-        <div className="session-card">
-          <span>Usuario</span>
-          <strong>{session?.user?.name || session?.user?.sub || "Sesión"}</strong>
-          <button type="button" className="ghost-button" onClick={onLogout}>
-            Cerrar sesión
-          </button>
-        </div>
-      </div>
-
-      <section className="surface compact-card">
-        <div className="section-heading">
-          <div>
-            <h3>Validar preguntas</h3>
-            <p className="status-text">
-              Ingrese la identificación y genere las 3 preguntas.
-            </p>
-          </div>
-          <span className="step-badge">Paso 2</span>
-        </div>
-
-        <form className="inline-form" onSubmit={generarPreguntas}>
-          <div className="field">
-            <label htmlFor="numero-identificacion">Identificación</label>
-            <input
-              id="numero-identificacion"
-              value={numeroIdentificacion}
-              readOnly
-            />
-          </div>
-
-          <button type="submit" disabled={loadingPreguntas}>
-            {loadingPreguntas ? "Consultando..." : "Generar 3 preguntas"}
-          </button>
-        </form>
-      </section>
-
-      <section className="surface compact-card">
-        <div className="section-heading">
-          <div>
-            <h3>Respuestas del cliente</h3>
-            <p className="status-text">
-              Marca las preguntas que coinciden con la respuesta registrada.
-            </p>
-          </div>
-          <span
-            className={`answer-result ${
-              !preguntas.length || !todasRespondidas
-                ? "pending"
-                : todasCorrectas
-                  ? "ok"
-                  : "bad"
-            }`}
-          >
-            {resumenValidacion}
+        <div className="workspace-meta">
+          <span className="status-chip">
+            <strong>Operador</strong>
+            {session?.user?.name || session?.user?.sub || "Sesion"}
           </span>
+          <span className="status-chip">
+            <strong>Cedula</strong>
+            {numeroIdentificacion}
+          </span>
+          <button type="button" className="ghost-button meta-action" onClick={onLogout}>
+            Cerrar sesion
+          </button>
         </div>
+      </header>
 
-        <div className="questions-grid compact-questions">
-          {preguntas.length ? (
-            preguntas.map((pregunta) => (
-              <article
-                className="question-card compact-question"
-                key={pregunta.codigo}
-              >
-                <div className="question-main">
-                  <div className="question-header">
-                    <span className="badge">{pregunta.dificultad}</span>
-                    <span>Código {pregunta.codigo}</span>
-                  </div>
-                  <h3>{pregunta.pregunta}</h3>
-                  <p>{pregunta.aclaracion}</p>
-                </div>
-
-                <div className="registered-answer">
-                  <span>Registrado</span>
-                  <strong>{pregunta.respuestaEsperada || "Sin dato"}</strong>
-                </div>
-
-                <div className="answer-tools">
-                  <label className="check-option ok-check single-check">
-                    <input
-                      type="checkbox"
-                      checked={pregunta.correcta}
-                      onChange={(event) =>
-                        actualizarRespuesta(
-                          pregunta.codigo,
-                          event.target.checked
-                        )
-                      }
-                    />
-                    Coincide
-                  </label>
-                  <details className="question-debug">
-                    <summary>Ver endpoint</summary>
-                    <JsonBox data={pregunta.payload} />
-                  </details>
-                </div>
-              </article>
-            ))
-          ) : (
-            <div className="empty-state">
-              Genera las preguntas para revisar la validación.
+      <section className="workspace-grid">
+        <div className="surface workspace-panel">
+          <div className="panel-head">
+            <div>
+              <span className="step-tag">Paso 2 de 3</span>
+              <h3>Preguntas de seguridad</h3>
             </div>
-          )}
+
+            <span className="answer-result">
+              {resumenValidacion}
+            </span>
+          </div>
+
+          <div className="questions-list">
+            {preguntas.map((pregunta) => (
+              <article className="question-row" key={pregunta.codigo}>
+                <div className="question-copy">
+                  <div className="question-meta">
+                    <span className="question-code">#{pregunta.codigo}</span>
+                    <span className="question-divider">/</span>
+                    <span>{pregunta.dificultad}</span>
+                  </div>
+                  <h4>{pregunta.pregunta}</h4>
+                </div>
+
+                <label className="check-option ok-check question-toggle">
+                  <input
+                    type="checkbox"
+                    checked={pregunta.correcta}
+                    onChange={(event) =>
+                      actualizarRespuesta(pregunta.codigo, event.target.checked)
+                    }
+                  />
+                  Validada
+                </label>
+              </article>
+            ))}
+          </div>
         </div>
-      </section>
 
-      <section className="surface compact-card block-card">
-        <div>
-          <h3>Bloqueo</h3>
-          <p className="status-text">
-            Solo se habilita cuando las 3 respuestas están marcadas como
-            correctas.
-          </p>
-        </div>
+        <aside className="surface workspace-aside">
+          <div className="aside-block">
+            <span className="identity-label">Cedula</span>
+            <strong>{numeroIdentificacion}</strong>
+          </div>
 
-        <button
-          type="button"
-          disabled={!todasCorrectas || loadingBloqueo}
-          onClick={bloquear}
-        >
-          {loadingBloqueo ? "Bloqueando..." : "Bloquear banca virtual"}
-        </button>
+          <div className="aside-block">
+            <span className="identity-label">Registro</span>
+            <strong>{resultadoCaso}</strong>
+          </div>
 
-        <details className="debug-details" open={Boolean(resultadoBloqueo.error)}>
-          <summary>Ver respuesta de bloqueo</summary>
-          <JsonBox data={resultadoBloqueo} />
-        </details>
-      </section>
+          <div className="aside-block">
+            <span className="identity-label">Accion</span>
+            <strong>{accionPrincipal}</strong>
+          </div>
 
-      <section className="surface compact-card">
-        <details className="debug-details">
-          <summary>Resumen técnico de consulta</summary>
-          <JsonBox data={resultadoConsulta} />
-        </details>
+          <button type="button" disabled={loadingBloqueo} onClick={bloquear}>
+            {loadingBloqueo ? "Guardando..." : accionPrincipal}
+          </button>
+        </aside>
       </section>
     </section>
   );
@@ -570,6 +465,7 @@ function App() {
   const [session, setSession] = useState(() => leerSesionInicial());
   const [numeroIdentificacion, setNumeroIdentificacion] = useState("");
   const [cedulaValidada, setCedulaValidada] = useState(false);
+  const [preguntasIniciales, setPreguntasIniciales] = useState([]);
 
   useEffect(() => {
     if (!session) {
@@ -591,10 +487,12 @@ function App() {
     });
     setCedulaValidada(false);
     setNumeroIdentificacion("");
+    setPreguntasIniciales([]);
   };
 
   const handleValidateCedula = (valor) => {
     setNumeroIdentificacion(valor);
+    setPreguntasIniciales(crearPreguntasIniciales());
     setCedulaValidada(true);
   };
 
@@ -602,13 +500,11 @@ function App() {
     setSession(null);
     setNumeroIdentificacion("");
     setCedulaValidada(false);
+    setPreguntasIniciales([]);
   };
 
   return (
     <main className="app-shell">
-      <div className="ambient ambient-one" />
-      <div className="ambient ambient-two" />
-
       {!session ? (
         <LoginScreen onLogin={handleLogin} />
       ) : !cedulaValidada ? (
@@ -619,9 +515,11 @@ function App() {
         />
       ) : (
         <AppShell
+          key={numeroIdentificacion}
           session={session}
           numeroIdentificacion={numeroIdentificacion}
           onLogout={handleLogout}
+          preguntasIniciales={preguntasIniciales}
         />
       )}
     </main>
