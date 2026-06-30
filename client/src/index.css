@@ -1,7 +1,7 @@
 :root {
-  color: #1f2430;
+  color: #232742;
   font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-  background: #f5f6f3;
+  background: #f4f5fb;
 }
 
 * {
@@ -16,8 +16,8 @@ body,
 
 body {
   margin: 0;
-  background: #f5f6f3;
-  color: #1f2430;
+  background: #f5f5f7;
+  color: #232742;
 }
 
 button,
